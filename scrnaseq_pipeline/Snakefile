@@ -1,0 +1,54 @@
+rule all:
+    input:
+        "results/umap.png",
+        "results/clustered_data.h5ad"
+
+rule preprocess_data:
+    input:
+        "data/expression_matrix.mtx.gz",
+        "data/PancrImmune1-metadata.tsv",
+        "data/PancrImmune1-cluster.tsv"
+    output:
+        "data/preprocessed_data.h5ad"
+    shell:
+        "python scripts/preprocess_data.py {input} {output}"
+
+rule qc:
+    input:
+        "data/preprocessed_data.h5ad"
+    output:
+        "results/qc_report.html"
+    shell:
+        "python scripts/qc.py {input} {output}"
+
+rule run_aracne:
+    input:
+        "data/preprocessed_data.h5ad"
+    output:
+        "data/aracne_results.tsv"
+    shell:
+        "python scripts/run_aracne.py {input} {output}"
+
+rule run_viper:
+    input:
+        "data/aracne_results.tsv"
+    output:
+        "results/protein_activity.h5ad"
+    shell:
+        "python scripts/run_viper.py {input} {output}"
+
+rule plot_umap:
+    input:
+        "results/protein_activity.h5ad"
+    output:
+        "results/umap.png"
+    shell:
+        "python scripts/plot_umap.py {input} {output}"
+
+rule cluster_data:
+    input:
+        "results/protein_activity.h5ad"
+    output:
+        "results/clustered_data.h5ad"
+    shell:
+        "python scripts/cluster_data.py {input} {output}"
