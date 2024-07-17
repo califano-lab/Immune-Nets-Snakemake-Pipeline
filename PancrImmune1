@@ -1,0 +1,101 @@
+import pandas as pd
+import os
+
+# 设置数据路径
+data_location = "/Users/lzy/Desktop/"
+metadata_file = os.path.join(data_location, "PancrImmune1-metadata.tsv")
+modified_metadata_file = os.path.join(data_location, "PancrImmune1-metadata_modified.tsv")
+
+# 检查文件是否存在
+def check_file(file_path):
+    if os.path.exists(file_path):
+        print(f"{file_path} 文件存在。")
+    else:
+        print(f"Error: {file_path} 文件不存在。")
+
+# 检查原始文件
+check_file(metadata_file)
+
+# 读取 metadata 文件
+metadata = pd.read_csv(metadata_file, sep='\t', header=None, low_memory=False)
+print(f"Original metadata rows: {len(metadata)}")
+
+# 删除多余的一行（假设多余的行在开头或结尾）
+metadata = metadata.drop(metadata.index[0])  # 删除第一行，如果是最后一行，则使用 metadata.drop(metadata.index[-1])
+print(f"Modified metadata rows: {len(metadata)}")
+
+# 保存修改后的 metadata 文件
+metadata.to_csv(modified_metadata_file, sep='\t', index=False, header=False)
+
+# 检查修改后的文件
+check_file(modified_metadata_file)
+
+import os
+import scanpy as sc
+import pandas as pd
+import warnings
+
+warnings.filterwarnings("ignore", message=".*The 'nopython' keyword.*")  # Ignore specific warnings
+
+# Set data paths
+data_location = "/Users/lzy/Desktop/"
+matrix_file = os.path.join(data_location, "expression_matrix.mtx.gz")
+metadata_file = os.path.join(data_location, "PancrImmune1-metadata_modified.tsv")
+cluster_file = os.path.join(data_location, "PancrImmune1-cluster.tsv")
+
+# Check if the file exists
+def check_file(file_path):
+    if os.path.exists(file_path):
+        print(f"{file_path} exists.")
+    else:
+        raise FileNotFoundError(f"Error: {file_path} does not exist.")
+
+# Check all files
+check_file(matrix_file)
+check_file(metadata_file)
+check_file(cluster_file)
+
+# Read gene expression signature
+gene_expr_signature = sc.read_mtx(matrix_file).T  # Transpose matrix to have cells as rows and genes as columns
+
+# Attempt to read data files
+try:
+    barcodes = pd.read_csv(metadata_file, header=None, sep='\t')
+    features = pd.read_csv(cluster_file, header=None, sep='\t')
+    
+    # Print dimensions for checking
+    print(f"Dimensions of gene_expr_signature.var: {gene_expr_signature.var.shape}")
+    print(f"Dimensions of features: {features.shape}")
+    
+    # Ensure the number of genes in features matches the number of genes in the expression matrix
+    if len(features) != gene_expr_signature.shape[1]:
+        raise ValueError("The number of genes in the features file does not match the number of genes in the expression matrix.")
+    
+    # Add barcodes and gene information
+    gene_expr_signature.obs['barcode'] = barcodes[0].values
+    gene_expr_signature.var['gene'] = features[1].values
+    gene_expr_signature.var_names = gene_expr_signature.var['gene']
+    gene_expr_signature.obs_names = gene_expr_signature.obs['barcode']
+
+    print(gene_expr_signature)
+
+    # Compute nearest neighbors
+    sc.pp.neighbors(gene_expr_signature, n_neighbors=10)
+
+    # Compute UMAP
+    sc.tl.umap(gene_expr_signature)
+
+    # Plot UMAP
+    sc.pl.umap(gene_expr_signature, color=['donor', 'sex', 'cell_type__ontology_label'])
+
+    # Cluster using Leiden algorithm
+    sc.tl.leiden(gene_expr_signature, resolution=0.1)
+
+    # Plot clustering result
+    sc.pl.umap(gene_expr_signature, color='leiden')
+    
+except FileNotFoundError as e:
+    print(f"Error: {e}")
+    print("Please check if the file path and name are correct and that the file exists.")
+except ValueError as e:
+    print(f"ValueError: {e}")
