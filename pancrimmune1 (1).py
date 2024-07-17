@@ -11,7 +11,7 @@ warnings.filterwarnings("ignore", message=".*The 'nopython' keyword.*")  # for j
 # Set data paths
 data_location = "/Users/lzy/Desktop/"
 matrix_file = data_location + "expression_matrix.mtx.gz"
-metadata_file = data_location + "PancrImmune1-metadata_modified.tsv"  # Use the modified metadata file
+metadata_file = data_location + "PancrImmune1-metadata.tsv"  # Use the modified metadata file
 cluster_file = data_location + "PancrImmune1-cluster.tsv"
 
 # Read gene expression signature
