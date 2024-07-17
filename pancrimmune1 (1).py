@@ -1,45 +1,3 @@
-pip install viper-in-python scanpy anndata pandas numpy
-
-import pandas as pd
-import os
-
-# Set data paths
-data_location = "/Users/lzy/Desktop/"
-metadata_file = os.path.join(data_location, "PancrImmune1-metadata.tsv")
-modified_metadata_file = os.path.join(data_location, "PancrImmune1-metadata_modified.tsv")
-
-# Check if the file exists
-def check_file(file_path):
-    if os.path.exists(file_path):
-        print(f"{file_path} exists.")
-    else:
-        print(f"Error: {file_path} does not exist.")
-
-# Check the original file
-check_file(metadata_file)
-
-# Read the metadata file
-metadata = pd.read_csv(metadata_file, sep='\t', header=None, low_memory=False)
-print(f"Original metadata rows: {len(metadata)}")
-
-# Remove the extra row (assuming the extra row is at the beginning or end)
-metadata = metadata.drop(metadata.index[0])  # Remove the first row; if it's the last row, use metadata.drop(metadata.index[-1])
-print(f"Modified metadata rows: {len(metadata)}")
-
-# Save the modified metadata file
-metadata.to_csv(modified_metadata_file, sep='\t', index=False, header=False)
-
-# Check the modified file
-check_file(modified_metadata_file)
-
-# View basic information about the metadata and clustering data
-metadata.info()
-clusters.info()
-
-# Check for missing values
-print(metadata.isnull().sum())
-print(clusters.isnull().sum())
-
 import pyviper
 import scanpy as sc
 import anndata
@@ -82,6 +40,7 @@ sc.pl.umap(gene_expr_signature, color=['donor', 'sex', 'cell_type__ontology_labe
 sc.tl.leiden(gene_expr_signature, resolution=0.1)
 
 # Plot clustering result
+sc.pl.umap(gene_expr_signature, color='leiden')
 sc.pl.umap(gene_expr_signature, color='leiden')
 
 
