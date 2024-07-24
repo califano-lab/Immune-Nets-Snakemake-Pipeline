@@ -1,54 +1,49 @@
 rule all:
     input:
-        "results/umap.png",
-        "results/clustered_data.h5ad"
+        "final_data.h5ad"
 
 rule preprocess_data:
-    input:
-        "data/expression_matrix.mtx.gz",
-        "data/PancrImmune1-metadata.tsv",
-        "data/PancrImmune1-cluster.tsv"
     output:
-        "data/preprocessed_data.h5ad"
-    shell:
-        "python scripts/preprocess_data.py {input} {output}"
+        "preprocessed_data.h5ad"
+    script:
+        "preprocess_data.py"
 
 rule qc:
     input:
-        "data/preprocessed_data.h5ad"
+        "preprocessed_data.h5ad"
     output:
-        "results/qc_report.html"
-    shell:
-        "python scripts/qc.py {input} {output}"
+        "qc_data.h5ad"
+    script:
+        "qc.py"
 
-rule run_aracne:
+rule normalize_data:
     input:
-        "data/preprocessed_data.h5ad"
+        "qc_data.h5ad"
     output:
-        "data/aracne_results.tsv"
-    shell:
-        "python scripts/run_aracne.py {input} {output}"
+        "normalized_data.h5ad"
+    script:
+        "normalize_data.py"
 
-rule run_viper:
+rule pca_analysis:
     input:
-        "data/aracne_results.tsv"
+        "normalized_data.h5ad"
     output:
-        "results/protein_activity.h5ad"
-    shell:
-        "python scripts/run_viper.py {input} {output}"
+        "pca_data.h5ad"
+    script:
+        "pca_analysis.py"
 
-rule plot_umap:
+rule umap_clustering:
     input:
-        "results/protein_activity.h5ad"
+        "pca_data.h5ad"
     output:
-        "results/umap.png"
-    shell:
-        "python scripts/plot_umap.py {input} {output}"
+        "umap_data.h5ad"
+    script:
+        "umap_clustering.py"
 
-rule cluster_data:
+rule differential_expression:
     input:
-        "results/protein_activity.h5ad"
+        "umap_data.h5ad"
     output:
-        "results/clustered_data.h5ad"
-    shell:
-        "python scripts/cluster_data.py {input} {output}"
+        "final_data.h5ad"
+    script:
+        "differential_expression.py"
