@@ -1,58 +1,44 @@
 rule all:
     input:
-        "results/umap.png",
-        "results/clustered_data.h5ad"
-
-rule download_data:
-    output:
-        "data/raw_data.h5ad"
-    shell:
-        "python scripts/download_data.py {output}"
+        "final_data.h5ad"
 
 rule preprocess_data:
     input:
-        "data/raw_data.h5ad"
+        matrix_file = "/Users/lzy/Desktop/bm_scp_gex_matrix.csv",
+        meta_file = "/Users/lzy/Desktop/bm_scp_meta_(1).txt"
     output:
-        "data/preprocessed_data.h5ad"
-    shell:
-        "python scripts/preprocess_data.py {input} {output}"
+        "/Users/lzy/Desktop/Immune-Nets/scrnaseq_pipeline/raw_data.h5ad"
+    script:
+        "/Users/lzy/Desktop/Immune-Nets/scrnaseq_pipeline/scripts/preprocess_data.py"
 
 rule qc:
     input:
-        "data/preprocessed_data.h5ad"
+        "/Users/lzy/Desktop/Immune-Nets/scrnaseq_pipeline/raw_data.h5ad"
     output:
-        "results/qc_report.html"
-    shell:
-        "python scripts/qc.py {input} {output}"
+        "/Users/lzy/Desktop/Immune-Nets/scrnaseq_pipeline/qc_data.h5ad"
+    script:
+        "/Users/lzy/Desktop/Immune-Nets/scrnaseq_pipeline/scripts/qc.py"
 
-rule run_aracne:
+rule normalize_data:
     input:
-        "data/preprocessed_data.h5ad"
+        "/Users/lzy/Desktop/Immune-Nets/scrnaseq_pipeline/qc_data.h5ad"
     output:
-        "data/aracne_results.tsv"
-    shell:
-        "python scripts/run_aracne.py {input} {output}"
+        "/Users/lzy/Desktop/Immune-Nets/scrnaseq_pipeline/normalized_data.h5ad"
+    script:
+        "/Users/lzy/Desktop/Immune-Nets/scrnaseq_pipeline/scripts/normalize_data.py"
 
-rule run_viper:
+rule pca_analysis:
     input:
-        "data/aracne_results.tsv"
+        "/Users/lzy/Desktop/Immune-Nets/scrnaseq_pipeline/normalized_data.h5ad"
     output:
-        "results/protein_activity.h5ad"
-    shell:
-        "python scripts/run_viper.py {input} {output}"
+        "/Users/lzy/Desktop/Immune-Nets/scrnaseq_pipeline/pca_data.h5ad"
+    script:
+        "/Users/lzy/Desktop/Immune-Nets/scrnaseq_pipeline/scripts/pca_analysis.py"
 
-rule plot_umap:
+rule umap_clustering:
     input:
-        "results/protein_activity.h5ad"
+        "/Users/lzy/Desktop/Immune-Nets/scrnaseq_pipeline/pca_data.h5ad"
     output:
-        "results/umap.png"
-    shell:
-        "python scripts/plot_umap.py {input} {output}"
-
-rule cluster_data:
-    input:
-        "results/protein_activity.h5ad"
-    output:
-        "results/clustered_data.h5ad"
-    shell:
-        "python scripts/cluster_data.py {input} {output}"
+        "/Users/lzy/Desktop/Immune-Nets/scrnaseq_pipeline/umap_data.h5ad"
+    script:
+        "/Users/lzy/Desktop/Imm
