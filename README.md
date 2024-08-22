@@ -2,16 +2,93 @@
 
 This repository contains a pipeline for analyzing single-cell RNA-seq (scRNA-seq) data. The analysis includes preprocessing, quality control, normalization, gene regulatory network inference using ARACNe3, and regulon activity analysis using PyViper.
 
-## Table of Contents
+## Pipeline Overview
+The pipeline is managed using a Snakefile, which defines the rules for each step in the analysis. Below is the content of the Snakefile, which outlines how the data is processed and how each step is connected:
 
-1. Preprocessing Data
-2. Quality Control
-3. Normalization
-4. PCA Analysis
-5. UMAP Clustering
-6. Differential Expression Analysis
-7. ARACNe3 for Network Inference
-8. Protein Activity Analysis with pyviper
+```
+rule all:
+    input:
+        heatmap="figures/heatmap.png",
+        umap_plot="figures/umap.png"
+
+rule load_and_preprocess:
+    input:
+        gene_expr="Tutorial_1_gExpr_fibroblast_5802.tsv",
+        network="fibroblast-net.tsv"
+
+    output:
+        processed_expr="results/processed_expr.h5ad",
+        processed_net="results/processed_net.pkl"
+    script:
+        "scripts/load_and_preprocess.py"
+
+rule viper_and_pca_analysis:
+    input:
+        processed_expr="results/processed_expr.h5ad",
+        processed_net="results/processed_net.pkl"
+    output:
+        prot_act_pca="results/prot_act_pca.h5ad"
+    script:
+        "scripts/viper_and_pca_analysis.py"
+
+rule clustering_and_umap:
+    input:
+        prot_act_pca="results/prot_act_pca.h5ad"
+    output:
+        umap_data="results/umap_data.h5ad",
+        umap_plot="figures/umap.png"
+    script:
+        "scripts/clustering_and_umap.py"
+
+rule integration_and_heatmap:
+    input:
+        umap_data="results/umap_data.h5ad"
+    output:
+        heatmap="figures/heatmap.png"
+    script:
+        "scripts/integration_and_heatmap.py"
+
+```
+
+## Description of Snakefile Rules
+
+1. all:
+
+Specifies the final outputs of the entire workflow, i.e., the UMAP plot (umap_plot) and the heatmap (heatmap).
+These will be generated as a result of running the entire pipeline.
+
+2. load_and_preprocess:
+
+Input: Takes the gene expression data (Tutorial_1_gExpr_fibroblast_5802.tsv) and the network data (fibroblast-net.tsv).
+
+Output: Produces preprocessed gene expression data (processed_expr.h5ad) and a processed network (processed_net.pkl).
+
+Script: Runs the script load_and_preprocess.py to carry out this task.
+
+3. viper_and_pca_analysis:
+
+Input: Takes the processed expression data and network from the previous step.
+
+Output: Outputs the protein activity PCA data (prot_act_pca.h5ad).
+
+Script: Executes viper_and_pca_analysis.py to perform VIPER analysis and PCA.
+
+4. clustering_and_umap:
+
+Input: Uses the PCA data from the previous step.
+
+Output: Outputs the UMAP plot data (umap_data.h5ad) and the UMAP plot image (umap_plot.png).
+
+Script: Runs the clustering_and_umap.py script for UMAP and clustering.
+
+5. integration_and_heatmap:
+
+Input: Takes the UMAP data from the previous step.
+
+Output: Produces the final heatmap (heatmap.png).
+
+Script: Executes integration_and_heatmap.py to generate the heatmap.
+
 
 ## Introduction
 
@@ -29,102 +106,120 @@ pip install scanpy pyviper
 
 This section handles the preprocessing of raw gene expression data and metadata to create an AnnData object that will be used for further analysis.
 
-```import scanpy as sc
+```import pandas as pd
+import scanpy as sc
+import pyviper
+import pickle
+
+def load_and_preprocess(gene_expr_path, network_path, output_expr, output_net):
+    gene_expr_signature = pd.read_csv(gene_expr_path, sep="\t", index_col=0)
+    gene_expr_signature = sc.AnnData(gene_expr_signature)
+    
+    network = pd.read_csv(network_path, delimiter="\t")
+    network_interactome = pyviper.Interactome('immune', network)
+    network_interactome.filter_targets(gene_expr_signature.var_names)
+    
+    # Save processed files
+    gene_expr_signature.write_h5ad(output_expr)
+    with open(output_net, 'wb') as f:
+        pickle.dump(network_interactome, f)
+
+if __name__ == "__main__":
+    load_and_preprocess(snakemake.input.gene_expr, snakemake.input.network, snakemake.output.processed_expr, snakemake.output.processed_net)
+```
+
+##  2. Viper and pca analysis
+This step performs VIPER analysis to estimate protein activity from gene expression data and then applies PCA for dimensionality reduction.
+```
+import scanpy as sc
+import pyviper
+import pickle
+
+def run_viper_and_pca(processed_expr_path, network_interactome_path):
+    # Load data
+    gene_expr_signature = sc.read_h5ad(processed_expr_path)
+    with open(network_interactome_path, 'rb') as f:
+        network_interactome = pickle.load(f)
+    
+    # Perform VIPER analysis and PCA
+    ProtAct_NaRnEA = pyviper.viper(gex_data=gene_expr_signature, interactome=network_interactome, enrichment="narnea", eset_filter=False, njobs=1, verbose=False)
+    pyviper.tl.pca(ProtAct_NaRnEA, layer="pes", zero_center=True, svd_solver='arpack', random_state=0)
+    return ProtAct_NaRnEA
+
+if __name__ == "__main__":
+    ProtAct_NaRnEA = run_viper_and_pca(snakemake.input.processed_expr, snakemake.input.processed_net)
+    ProtAct_NaRnEA.write_h5ad(snakemake.output.prot_act_pca)
+```
+
+##  3. UMAP and Clustering
+This step performs UMAP for dimensionality reduction and clustering analysis using the Leiden algorithm.
+```
+import scanpy as sc
+import matplotlib.pyplot as plt
+import os
+
+def perform_clustering_and_umap(input_file, output_file, output_figure):
+    data = sc.read_h5ad(input_file)
+    
+    # Perform neighborhood analysis, clustering, and UMAP
+    sc.pp.neighbors(data, n_neighbors=20, n_pcs=50)
+    sc.tl.leiden(data, resolution=0.1)
+    sc.tl.umap(data)
+
+    # Ensure output directory exists
+    os.makedirs(os.path.dirname(output_figure), exist_ok=True)
+
+    # Save UMAP plot
+    sc.pl.umap(data, color='leiden', show=False, save=False)  # 先生成图，不直接保存
+    plt.savefig(output_figure)  # 使用matplotlib保存，确保路径正确
+    plt.close()
+
+    # Save processed data
+    data.write_h5ad(output_file)
+
+if __name__ == "__main__":
+    perform_clustering_and_umap(
+        snakemake.input.prot_act_pca, 
+        snakemake.output.umap_data, 
+        snakemake.output.umap_plot
+    )
+
+```
+##  4. Heatmap Generation
+generates heatmaps to visualize the top activated proteins across clusters.
+```
 import pandas as pd
-import numpy as np
-
-# Define file paths
-data_path = "/Users/lzy/Desktop/"
-matrix_file = data_path + "bm_scp_gex_matrix.csv"
-meta_file = data_path + "bm_scp_meta_(1).txt"
-
-# Load gene expression matrix
-gene_expression = pd.read_csv(matrix_file, index_col=0)
-gene_expression = gene_expression.T  # Transpose to make genes in columns
-
-# Load metadata information
-meta_data = pd.read_csv(meta_file, sep="\t", index_col=0)
-
-# Check and align metadata and gene expression data
-common_indices = gene_expression.index.intersection(meta_data.index)
-gene_expression = gene_expression.loc[common_indices]
-meta_data = meta_data.loc[common_indices]
-
-# Create AnnData object
-adata = sc.AnnData(gene_expression)
-adata.obs = meta_data
-
-# Save preprocessed data
-adata.write(data_path + "preprocessed_data.h5ad")
-```
-
-##  2. Normalizing Data
-```After preprocessing, the data needs to be normalized. This section covers the steps to normalize and scale the data, making it ready for PCA and UMAP analysis.
-
 import scanpy as sc
+import pyviper
+import pickle
 
-data_path = "/Users/lzy/Desktop/"
-adata = sc.read(data_path + "preprocessed_data.h5ad")
+def load_and_preprocess(gene_expr_path, network_path, output_expr, output_net):
+    gene_expr_signature = pd.read_csv(gene_expr_path, sep="\t", index_col=0)
+    gene_expr_signature = sc.AnnData(gene_expr_signature)
+    
+    network = pd.read_csv(network_path, delimiter="\t")
+    network_interactome = pyviper.Interactome('immune', network)
+    network_interactome.filter_targets(gene_expr_signature.var_names)
+    
+    # Save processed files
+    gene_expr_signature.write_h5ad(output_expr)
+    with open(output_net, 'wb') as f:
+        pickle.dump(network_interactome, f)
 
-# Normalization and transformation
-sc.pp.normalize_total(adata, target_sum=1e4)
-sc.pp.log1p(adata)
-sc.pp.highly_variable_genes(adata, min_mean=0.0125, max_mean=3, min_disp=0.5)
-adata = adata[:, adata.var['highly_variable']]
-sc.pp.regress_out(adata, ['total_counts', 'percent_mito'])
-sc.pp.scale(adata, max_value=10)
-
-# Save normalized data
-adata.write(data_path + "normalized_data.h5ad")
+if __name__ == "__main__":
+    load_and_preprocess(snakemake.input.gene_expr, snakemake.input.network, snakemake.output.processed_expr, snakemake.output.processed_net)
+```
+## Usage
+To run the entire workflow, navigate to the directory containing the Snakefile and execute the following command:
+bash code:
+```
+snakemake --cores 1 --snakefile Snakefile2
 ```
 
-##  3. PCA Analysis
-```
-import scanpy as sc
 
-data_path = "/Users/lzy/Desktop/"
-adata = sc.read(data_path + "normalized_data.h5ad")
+![umap](https://github.com/user-attachments/assets/599f3d12-6770-4a7d-81fa-22217a25488e)
+![heatmap](https://github.com/user-attachments/assets/d8ce1c10-7ab1-45cd-ba87-53205146e09f)
 
-# PCA analysis
-sc.tl.pca(adata, svd_solver='arpack')
-sc.pl.pca(adata, color='Cell_Type')
-
-# Save PCA data
-adata.write(data_path + "pca_data.h5ad")
-```
-##  4. UMAP Clustering
-Use UMAP for clustering analysis and visualize the results.
-```
-import scanpy as sc
-
-data_path = "/Users/lzy/Desktop/"
-adata = sc.read(data_path + "pca_data.h5ad")
-
-# Clustering analysis and UMAP visualization
-sc.pp.neighbors(adata, n_neighbors=10, n_pcs=40)
-sc.tl.leiden(adata)
-sc.tl.umap(adata)
-sc.pl.umap(adata, color=['Cell_Type', 'leiden'])
-
-# Save UMAP data
-adata.write(data_path + "umap_data.h5ad")
-```
-
-## 5. Differential Expression Analysis
-Identify differentially expressed genes across clusters.
-```
-import scanpy as sc
-
-data_path = "/Users/lzy/Desktop/"
-adata = sc.read(data_path + "umap_data.h5ad")
-
-# Differential expression analysis
-sc.tl.rank_genes_groups(adata, 'leiden', method='wilcoxon')
-sc.pl.rank_genes_groups(adata, n_genes=25, sharey=False)
-
-# Save differential expression data
-adata.write(data_path + "differential_expression_data.h5ad")
-```
 
 ##  ARACNe-3 Analysis
 
