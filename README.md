@@ -1,4 +1,4 @@
-# Project Title: Analyzing scRNA-seq Data with ARACNe3 and PyViper
+# Project Title: scRNA-seq Data Analysis Pipeline with PyVIPER
 
 This repository contains a pipeline for analyzing single-cell RNA-seq (scRNA-seq) data. The analysis includes preprocessing, quality control, normalization, gene regulatory network inference using ARACNe3, and regulon activity analysis using PyViper.
 
