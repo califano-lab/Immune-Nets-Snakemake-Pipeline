@@ -285,6 +285,91 @@ snakemake --cores 1 --snakefile Snakefile2
 ![umap](https://github.com/user-attachments/assets/599f3d12-6770-4a7d-81fa-22217a25488e)
 ![heatmap](https://github.com/user-attachments/assets/d8ce1c10-7ab1-45cd-ba87-53205146e09f)
 
+## Whole Pipeline
+
+```
+rule all:
+    input:
+        heatmap="figures/heatmap.png",
+        umap_plot="figures/umap.png",
+        formatted_network="results/formatted_network.tsv"
+
+rule run_aracne3:
+    input:
+        expr_matrix="/Users/lzy/Desktop/Network pipeline/exp_mat_cleaned.txt",
+        regulators="/Users/lzy/Desktop/Network pipeline/regulators.txt"
+    output:
+        consolidated_net="results/consolidated-net_defaultid.tsv"
+    shell:
+        """
+        /Users/lzy/Desktop/ARACNe3/build/src/app/ARACNe3_app_release \
+        -e {input.expr_matrix} \
+        -r {input.regulators} \
+        -o {output.consolidated_net} \
+        -x 30 --alpha 0.05 --threads 1
+        """
+
+rule consolidate_subnetworks:
+    input:
+        # Adjust the pattern to match your actual subnetwork files
+        expand("results/subnetwork_{i}.tsv", i=range(1, 31))
+    output:
+        consolidated_net="results/consolidated-net_defaultid.tsv"
+    shell:
+        "cat {input} > {output}"
+
+rule format_network:
+    input:
+        consolidated_net="results/consolidated-net_defaultid.tsv"
+    output:
+        formatted_network="results/formatted_network.tsv"
+    script:
+        "scripts/format_network.py"
+
+rule load_and_preprocess:
+    input:
+        gene_expr="Tutorial_1_gExpr_fibroblast_5802.tsv",
+        network="results/formatted_network.tsv"  # Use formatted network here if needed
+    output:
+        processed_expr="results/processed_expr.h5ad",
+        processed_net="results/processed_net.pkl"
+    conda:
+        "environment.yaml"
+    script:
+        "scripts/load_and_preprocess.py"
+
+rule viper_and_pca_analysis:
+    input:
+        processed_expr="results/processed_expr.h5ad",
+        processed_net="results/processed_net.pkl"
+    output:
+        prot_act_pca="results/prot_act_pca.h5ad"
+    conda:
+        "environment.yaml"
+    script:
+        "scripts/viper_and_pca_analysis.py"
+
+rule clustering_and_umap:
+    input:
+        prot_act_pca="results/prot_act_pca.h5ad"
+    output:
+        umap_data="results/umap_data.h5ad",
+        umap_plot="figures/umap.png"
+    conda:
+        "environment.yaml"
+    script:
+        "scripts/clustering_and_umap.py"
+
+rule integration_and_heatmap:
+    input:
+        umap_data="results/umap_data.h5ad"
+    output:
+        heatmap="figures/heatmap.png"
+    conda:
+        "environment.yaml"
+    script:
+        "scripts/integration_and_heatmap.py"
+```
 
 ##  ARACNe-3 Analysis
 
