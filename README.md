@@ -119,40 +119,80 @@ rule integration_and_heatmap:
 
 1. all:
 
-Specifies the final outputs of the entire workflow, i.e., the UMAP plot (umap_plot) and the heatmap (heatmap).
-These will be generated as a result of running the entire pipeline.
+Purpose: Defines the final outputs of the entire workflow, ensuring that all steps are completed.
+Outputs:
+A heatmap image for each dataset (results/{dataset}_heatmap.png).
+A UMAP plot image for each dataset (results/{dataset}_umap.png).
+A formatted network file for each dataset (results/{dataset}_formatted_network.tsv).
+Functionality: This rule serves as a final checkpoint to verify that all datasets have been processed completely through the entire pipeline.
 
-2. load_and_preprocess:
+2.rename_files:
 
-Input: Takes the gene expression data (Tutorial_1_gExpr_fibroblast_5802.tsv) and the network data (fibroblast-net.tsv).
+Purpose: Standardizes the names and formats of gene expression files in the data directory.
+Inputs:
+The data directory containing all the gene expression files.
+Outputs:
+A completion flag file (renamed.complete) to indicate that all files have been renamed and formatted correctly.
+Script: Runs rename_files.py to perform the renaming and formatting operations.
 
-Output: Produces preprocessed gene expression data (processed_expr.h5ad) and a processed network (processed_net.pkl).
+3.run_aracne3:
 
-Script: Runs the script load_and_preprocess.py to carry out this task.
+Purpose: Runs ARACNe3 to generate gene regulatory networks based on gene expression data and the combined regulators file.
+Inputs:
+Gene expression file (data/{dataset}.tsv).
+Combined regulators file (combined_regulators.txt).
+Outputs:
+ARACNe3 consolidated network output (results/{dataset}_consolidated-net_defaultid.tsv).
+Shell Command: Executes the ARACNe3 tool with the specified parameters to generate the network.
 
-3. viper_and_pca_analysis:
+4.format_network:
 
-Input: Takes the processed expression data and network from the previous step.
+Purpose: Converts the ARACNe3 output into a format compatible with PyViper for further analysis.
+Inputs:
+Consolidated network file from ARACNe3 (results/{dataset}_consolidated-net_defaultid.tsv).
+Outputs:
+Formatted network file (results/{dataset}_formatted_network.tsv).
+Script: Runs format_network.py to format the network data.
 
-Output: Outputs the protein activity PCA data (prot_act_pca.h5ad).
+5.load_and_preprocess:
 
-Script: Executes viper_and_pca_analysis.py to perform VIPER analysis and PCA.
+Purpose: Loads gene expression data and formatted network data, performs necessary preprocessing for downstream analysis.
+Inputs:
+Gene expression file (data/{dataset}.tsv).
+Formatted network file (results/{dataset}_formatted_network.tsv).
+Outputs:
+Preprocessed gene expression data (results/{dataset}_processed_expr.h5ad).
+Processed network file (results/{dataset}_processed_net.pkl).
+Script: Executes load_and_preprocess.py to preprocess the data.
 
-4. clustering_and_umap:
+6. viper_and_pca_analysis:
 
-Input: Uses the PCA data from the previous step.
+Purpose: Performs VIPER analysis to compute protein activity scores and reduces dimensionality using PCA.
+Inputs:
+Preprocessed gene expression data (results/{dataset}_processed_expr.h5ad).
+Processed network file (results/{dataset}_processed_net.pkl).
+Outputs:
+Protein activity PCA data (results/{dataset}_prot_act_pca.h5ad).
+Script: Runs viper_and_pca_analysis.py to compute VIPER scores and perform PCA.
 
-Output: Outputs the UMAP plot data (umap_data.h5ad) and the UMAP plot image (umap_plot.png).
+7. clustering_and_umap:
 
-Script: Runs the clustering_and_umap.py script for UMAP and clustering.
+Purpose: Clusters the data based on protein activity scores and generates UMAP visualization.
+Inputs:
+Protein activity PCA data (results/{dataset}_prot_act_pca.h5ad).
+Outputs:
+UMAP data (results/{dataset}_umap_data.h5ad).
+UMAP plot image (results/{dataset}_umap.png).
+Script: Executes clustering_and_umap.py to perform clustering and generate UMAP plots.
 
-5. integration_and_heatmap:
+8. integration_and_heatmap:
 
-Input: Takes the UMAP data from the previous step.
-
-Output: Produces the final heatmap (heatmap.png).
-
-Script: Executes integration_and_heatmap.py to generate the heatmap.
+Purpose: Integrates the results from UMAP and clustering steps and generates a heatmap to visualize the data.
+Inputs:
+UMAP data (results/{dataset}_umap_data.h5ad).
+Outputs:
+Final heatmap image (results/{dataset}_heatmap.png).
+Script: Runs integration_and_heatmap.py to create a heatmap.
 
 
 ## Introduction
@@ -288,51 +328,48 @@ snakemake --cores 1 --snakefile Snakefile2
 ## Whole Pipeline
 
 ```
+import glob
+
+# 动态检测data文件夹中的所有基因表达文件
+gene_expr_files = sorted(glob.glob("data/*.tsv"))
+datasets = [os.path.splitext(os.path.basename(f))[0] for f in gene_expr_files]
+
 rule all:
     input:
-        heatmap="figures/heatmap.png",
-        umap_plot="figures/umap.png",
-        formatted_network="results/formatted_network.tsv"
+        expand("results/{dataset}_heatmap.png", dataset=datasets),
+        expand("results/{dataset}_umap.png", dataset=datasets),
+        expand("results/{dataset}_formatted_network.tsv", dataset=datasets)
 
 rule run_aracne3:
     input:
-        expr_matrix="/Users/lzy/Desktop/Network pipeline/exp_mat_cleaned.txt",
-        regulators="/Users/lzy/Desktop/Network pipeline/regulators.txt"
+        expr_matrix="data/{dataset}.tsv",
+        regulators="combined_regulators.txt"
     output:
-        consolidated_net="results/consolidated-net_defaultid.tsv"
+        "results/{dataset}_consolidated-net_defaultid.tsv"
     shell:
         """
         /Users/lzy/Desktop/ARACNe3/build/src/app/ARACNe3_app_release \
         -e {input.expr_matrix} \
         -r {input.regulators} \
-        -o {output.consolidated_net} \
+        -o results/{wildcards.dataset}_consolidated-net_defaultid.tsv \
         -x 30 --alpha 0.05 --threads 1
         """
 
-rule consolidate_subnetworks:
-    input:
-        # Adjust the pattern to match your actual subnetwork files
-        expand("results/subnetwork_{i}.tsv", i=range(1, 31))
-    output:
-        consolidated_net="results/consolidated-net_defaultid.tsv"
-    shell:
-        "cat {input} > {output}"
-
 rule format_network:
     input:
-        consolidated_net="results/consolidated-net_defaultid.tsv"
+        "results/{dataset}_consolidated-net_defaultid.tsv"
     output:
-        formatted_network="results/formatted_network.tsv"
+        "results/{dataset}_formatted_network.tsv"
     script:
         "scripts/format_network.py"
 
 rule load_and_preprocess:
     input:
-        gene_expr="Tutorial_1_gExpr_fibroblast_5802.tsv",
-        network="results/formatted_network.tsv"  # Use formatted network here if needed
+        gene_expr="data/{dataset}.tsv",
+        network="results/{dataset}_formatted_network.tsv"
     output:
-        processed_expr="results/processed_expr.h5ad",
-        processed_net="results/processed_net.pkl"
+        processed_expr="results/{dataset}_processed_expr.h5ad",
+        processed_net="results/{dataset}_processed_net.pkl"
     conda:
         "environment.yaml"
     script:
@@ -340,10 +377,10 @@ rule load_and_preprocess:
 
 rule viper_and_pca_analysis:
     input:
-        processed_expr="results/processed_expr.h5ad",
-        processed_net="results/processed_net.pkl"
+        processed_expr="results/{dataset}_processed_expr.h5ad",
+        processed_net="results/{dataset}_processed_net.pkl"
     output:
-        prot_act_pca="results/prot_act_pca.h5ad"
+        prot_act_pca="results/{dataset}_prot_act_pca.h5ad"
     conda:
         "environment.yaml"
     script:
@@ -351,10 +388,10 @@ rule viper_and_pca_analysis:
 
 rule clustering_and_umap:
     input:
-        prot_act_pca="results/prot_act_pca.h5ad"
+        prot_act_pca="results/{dataset}_prot_act_pca.h5ad"
     output:
-        umap_data="results/umap_data.h5ad",
-        umap_plot="figures/umap.png"
+        umap_data="results/{dataset}_umap_data.h5ad",
+        umap_plot="results/{dataset}_umap.png"
     conda:
         "environment.yaml"
     script:
@@ -362,9 +399,9 @@ rule clustering_and_umap:
 
 rule integration_and_heatmap:
     input:
-        umap_data="results/umap_data.h5ad"
+        umap_data="results/{dataset}_umap_data.h5ad"
     output:
-        heatmap="figures/heatmap.png"
+        heatmap="results/{dataset}_heatmap.png"
     conda:
         "environment.yaml"
     script:
