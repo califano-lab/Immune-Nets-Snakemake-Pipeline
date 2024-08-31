@@ -17,4 +17,4 @@ def load_and_preprocess(gene_expr_path, network_path, output_expr, output_net):
         pickle.dump(network_interactome, f)
 
 if __name__ == "__main__":
-    load_and_preprocess(snakemake.input.gene_expr, snakemake.input.network, snakemake.output.processed_expr, snakemake.output.processed_net)
+    load_and_preprocess(snakemake.input.gene_expr, snakemake.input.formatted_network, snakemake.output.processed_expr, snakemake.output.processed_net)
