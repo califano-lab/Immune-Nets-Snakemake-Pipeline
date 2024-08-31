@@ -1,0 +1,32 @@
+import os
+import pyviper
+import pandas as pd
+
+# Define the input and output root directories
+input_root_dir = "results"
+output_root_dir = "results"
+
+# Retrieve all subdirectories, assuming all subdirectory names start with "gene_expression_sub_"
+subdirs = sorted([d for d in os.listdir(input_root_dir) if d.startswith("gene_expression_sub_")])
+
+for subdir in subdirs:
+    input_file = os.path.join(input_root_dir, subdir, "consolidated-net_defaultid.tsv")
+    output_file = os.path.join(output_root_dir, f"{subdir}_formatted_network.tsv")
+
+    if os.path.exists(input_file):
+        try:
+            # Convert the ARACNe3 output to a regulon DataFrame
+            regulon_df = pyviper.pp.aracne3_to_regulon(
+                net_file=input_file,
+                MI_thres=0,                   # Threshold for Mutual Information
+                regul_size=50,                # Maximum number of targets per regulator
+                normalize_MI_per_regulon=True # Normalize MI scores within each regulon
+            )
+
+            # Save the formatted network to a file
+            regulon_df.to_csv(output_file, sep='\t', index=False)
+            print(f"Formatted network for {subdir} saved to {output_file}.")
+        except Exception as e:
+            print(f"Failed to process {input_file} due to error: {e}")
+    else:
+        print(f"Input file {input_file} does not exist.")
