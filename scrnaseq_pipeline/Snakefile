@@ -1,49 +1,86 @@
+import os
+import glob
+
+# Detect all gene expression files in the data folder dynamically
+gene_expr_files = sorted(glob.glob("data/*.tsv"))
+datasets = [os.path.splitext(os.path.basename(f))[0] for f in gene_expr_files]
+
 rule all:
     input:
-        "final_data.h5ad"
+        expand("results/{dataset}_heatmap.png", dataset=datasets),
+        expand("results/{dataset}_umap.png", dataset=datasets),
 
-rule preprocess_data:
-    output:
-        "preprocessed_data.h5ad"
-    script:
-        "preprocess_data.py"
 
-rule qc:
+# Step 1: Convert and rename files if necessary
+rule rename_files:
     input:
-        "preprocessed_data.h5ad"
+        gene_expr_dir="data"
     output:
-        "qc_data.h5ad"
+        "renamed.complete"
     script:
-        "qc.py"
+        "scripts/rename_files.py"
 
-rule normalize_data:
+# Step 2: Run ARACNe3 to generate networks
+rule run_aracne3:
     input:
-        "qc_data.h5ad"
+        expr_matrix="data/{dataset}.tsv",
+        regulators="combined_regulators.txt"
     output:
-        "normalized_data.h5ad"
-    script:
-        "normalize_data.py"
+        directory("results/{dataset}_consolidated-net_defaultid")
+    shell:
+        """
+        /Users/lzy/Desktop/ARACNe3/build/src/app/ARACNe3_app_release \
+        -e {input.expr_matrix} \
+        -r {input.regulators} \
+        -o results/{wildcards.dataset}_consolidated-net_defaultid \
+        -x 10 --alpha 0.05 --threads 1
+        """
 
-rule pca_analysis:
+# Step 3: Convert ARACNe3 output to formatted networks
+rule format_network:
     input:
-        "normalized_data.h5ad"
+        aracne_output="results/{dataset}_consolidated-net_defaultid/consolidated-net_defaultid.tsv"
     output:
-        "pca_data.h5ad"
+        formatted_network="results/{dataset}_consolidated-net_defaultid_formatted_network.tsv"
     script:
-        "pca_analysis.py"
+        "scripts/format_network.py"
 
-rule umap_clustering:
+# Step 4: Load and preprocess data for VIPER
+rule load_and_preprocess:
     input:
-        "pca_data.h5ad"
+        gene_expr="data/{dataset}.tsv",
+        formatted_network="results/{dataset}_consolidated-net_defaultid_formatted_network.tsv"
     output:
-        "umap_data.h5ad"
+        processed_expr="results/{dataset}_processed_expr.h5ad",
+        processed_net="results/{dataset}_processed_net.pkl"
     script:
-        "umap_clustering.py"
+        "scripts/load_and_preprocess.py"
 
-rule differential_expression:
+# Step 5: VIPER analysis and PCA
+rule viper_and_pca_analysis:
     input:
-        "umap_data.h5ad"
+        processed_expr="results/{dataset}_processed_expr.h5ad",
+        processed_net="results/{dataset}_processed_net.pkl"
     output:
-        "final_data.h5ad"
+        prot_act_pca="results/{dataset}_prot_act_pca.h5ad"
     script:
-        "differential_expression.py"
+        "scripts/viper_and_pca_analysis.py"
+
+# Step 6: Clustering and UMAP analysis
+rule clustering_and_umap:
+    input:
+        prot_act_pca="results/{dataset}_prot_act_pca.h5ad"
+    output:
+        umap_data="results/{dataset}_umap_data.h5ad",
+        umap_plot="results/{dataset}_umap.png"
+    script:
+        "scripts/clustering_and_umap.py"
+
+# Step 7: Generate Heatmap
+rule integration_and_heatmap:
+    input:
+        umap_data="results/{dataset}_umap_data.h5ad"
+    output:
+        heatmap="results/{dataset}_heatmap.png"
+    script:
+        "scripts/integration_and_heatmap.py"
