@@ -1,44 +1,89 @@
+# Read input and output folder from config or command-line arguments
+input_folder = config.get("input_folder", "data")  # Default is "data" if not provided
+output_folder = config.get("output_folder", "results")  # Default is "results" if not provided
+​
+# Detect all gene expression files in the input folder dynamically
+import os
+import glob
+​
+gene_expr_files = sorted(glob.glob(f"{input_folder}/*.tsv"))
+datasets = [os.path.splitext(os.path.basename(f))[0] for f in gene_expr_files]
+​
 rule all:
     input:
-        "final_data.h5ad"
-
-rule preprocess_data:
+        expand(f"{output_folder}/{{dataset}}_heatmap.png", dataset=datasets),
+        expand(f"{output_folder}/{{dataset}}_umap.png", dataset=datasets)
+​
+# Step 1: Convert and rename files if necessary
+rule rename_files:
     input:
-        matrix_file = "/Users/lzy/Desktop/bm_scp_gex_matrix.csv",
-        meta_file = "/Users/lzy/Desktop/bm_scp_meta_(1).txt"
+        gene_expr_dir=input_folder
     output:
-        "/Users/lzy/Desktop/Immune-Nets/scrnaseq_pipeline/raw_data.h5ad"
+        "renamed.complete"
     script:
-        "/Users/lzy/Desktop/Immune-Nets/scrnaseq_pipeline/scripts/preprocess_data.py"
-
-rule qc:
+        "scripts/rename_files.py"
+​
+# Step 2: Run ARACNe3 to generate networks
+rule run_aracne3:
     input:
-        "/Users/lzy/Desktop/Immune-Nets/scrnaseq_pipeline/raw_data.h5ad"
+        expr_matrix=f"{input_folder}/{{dataset}}.tsv",
+        regulators="combined_regulators.txt"
     output:
-        "/Users/lzy/Desktop/Immune-Nets/scrnaseq_pipeline/qc_data.h5ad"
-    script:
-        "/Users/lzy/Desktop/Immune-Nets/scrnaseq_pipeline/scripts/qc.py"
-
-rule normalize_data:
+        directory(f"{output_folder}/{{dataset}}_consolidated-net_defaultid")
+    shell:
+        """
+        /Users/lzy/Desktop/ARACNe3/build/src/app/ARACNe3_app_release \
+        -e {input.expr_matrix} \
+        -r {input.regulators} \
+        -o {output}/{{wildcards.dataset}}_consolidated-net_defaultid \
+        -x 10 --alpha 0.05 --threads 1
+        """
+​
+# Step 3: Convert ARACNe3 output to formatted networks
+rule format_network:
     input:
-        "/Users/lzy/Desktop/Immune-Nets/scrnaseq_pipeline/qc_data.h5ad"
+        aracne_output=f"{output_folder}/{{dataset}}_consolidated-net_defaultid/consolidated-net_defaultid.tsv"
     output:
-        "/Users/lzy/Desktop/Immune-Nets/scrnaseq_pipeline/normalized_data.h5ad"
+        formatted_network=f"{output_folder}/{{dataset}}_consolidated-net_defaultid_formatted_network.tsv"
     script:
-        "/Users/lzy/Desktop/Immune-Nets/scrnaseq_pipeline/scripts/normalize_data.py"
-
-rule pca_analysis:
+        "scripts/format_network.py"
+​
+# Step 4: Load and preprocess data for VIPER
+rule load_and_preprocess:
     input:
-        "/Users/lzy/Desktop/Immune-Nets/scrnaseq_pipeline/normalized_data.h5ad"
+        gene_expr=f"{input_folder}/{{dataset}}.tsv",
+        formatted_network=f"{output_folder}/{{dataset}}_consolidated-net_defaultid_formatted_network.tsv"
     output:
-        "/Users/lzy/Desktop/Immune-Nets/scrnaseq_pipeline/pca_data.h5ad"
+        processed_expr=f"{output_folder}/{{dataset}}_processed_expr.h5ad",
+        processed_net=f"{output_folder}/{{dataset}}_processed_net.pkl"
     script:
-        "/Users/lzy/Desktop/Immune-Nets/scrnaseq_pipeline/scripts/pca_analysis.py"
-
-rule umap_clustering:
+        "scripts/load_and_preprocess.py"
+​
+# Step 5: VIPER analysis and PCA
+rule viper_and_pca_analysis:
     input:
-        "/Users/lzy/Desktop/Immune-Nets/scrnaseq_pipeline/pca_data.h5ad"
+        processed_expr=f"{output_folder}/{{dataset}}_processed_expr.h5ad",
+        processed_net=f"{output_folder}/{{dataset}}_processed_net.pkl"
     output:
-        "/Users/lzy/Desktop/Immune-Nets/scrnaseq_pipeline/umap_data.h5ad"
+        prot_act_pca=f"{output_folder}/{{dataset}}_prot_act_pca.h5ad"
     script:
-        "/Users/lzy/Desktop/Imm
+        "scripts/viper_and_pca_analysis.py"
+​
+# Step 6: Clustering and UMAP analysis
+rule clustering_and_umap:
+    input:
+        prot_act_pca=f"{output_folder}/{{dataset}}_prot_act_pca.h5ad"
+    output:
+        umap_data=f"{output_folder}/{{dataset}}_umap_data.h5ad",
+        umap_plot=f"{output_folder}/{{dataset}}_umap.png"
+    script:
+        "scripts/clustering_and_umap.py"
+​
+# Step 7: Generate Heatmap
+rule integration_and_heatmap:
+    input:
+        umap_data=f"{output_folder}/{{dataset}}_umap_data.h5ad"
+    output:
+        heatmap=f"{output_folder}/{{dataset}}_heatmap.png"
+    script:
+        "scripts/integration_and_heatmap.py"
