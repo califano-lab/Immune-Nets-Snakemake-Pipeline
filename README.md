@@ -387,7 +387,6 @@ if __name__ == "__main__":
         snakemake.output.umap_plot
     )
 
-
 ```
 ##  6. Heatmap Generation
 
@@ -397,7 +396,7 @@ import pyviper
 import matplotlib.pyplot as plt
 import numpy as np
 
-def generate_heatmap(data_path, output_path):
+def generate_heatmap(data_path, output_path, N=50):
     # Ensure all previous plot windows are closed
     plt.close('all')
     
@@ -405,20 +404,17 @@ def generate_heatmap(data_path, output_path):
     
     # Process data to ensure there are no invalid values
     data.X = np.where(data.X <= 0, np.min(data.X[data.X > 0]), data.X)
-
-    # Generate and save the heatmap
+    
     try:
-        sc.pp.neighbors(data, n_neighbors=10, n_pcs=40)
-        sc.tl.leiden(data)
-        sc.tl.umap(data)
-        sc.tl.rank_genes_groups(data, 'leiden', method='t-test', n_genes=20)
+        # 选择前 N 个最活跃的蛋白质
+        protein_set = data.var_names[:N]
         
-        # Generate the heatmap using Scanpy's heatmap plotting function
-        sc.pl.heatmap(data, var_names=data.uns['rank_genes_groups']['names']['0'], groupby='leiden', cmap='viridis', show=False)
+        # 创建热图
+        pyviper.pl.heatmap(data, var_names=protein_set, groupby="leiden", vcenter=0, cmap="RdBu_r", swap_axes=True, show=False)
         
-        # Save the image
-        plt.savefig(output_path)
-        plt.close()  # Close the image to ensure no additional blank plots are generated
+        # 保存图像
+        plt.savefig(output_path, bbox_inches="tight")
+        plt.close()
         
     except Exception as e:
         print(f"Failed to generate heatmap due to: {e}")
