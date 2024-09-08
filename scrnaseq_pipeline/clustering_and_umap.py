@@ -13,8 +13,8 @@ def perform_clustering_and_umap(input_file, output_file, output_figure):
     # Ensure the output directory exists
     os.makedirs(os.path.dirname(output_figure), exist_ok=True)
 
-    # Save the UMAP figure
-    sc.pl.umap(data, color='leiden', show=False, save=False)  # Generate the plot without directly saving
+    # Save the UMAP plot
+    sc.pl.umap(data, color='leiden', show=False, save=False)  # Generate the plot without directly saving it
     plt.savefig(output_figure)  # Save using matplotlib to ensure the path is correct
     plt.close()
 
