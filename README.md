@@ -13,30 +13,23 @@ Snakemake is a workflow management system that allows you to create reproducible
 
 ```
 # Read input and output folder from config or command-line arguments
-input_folder = config.get("input_folder", "data")  # Default is "data" if not provided
-output_folder = config.get("output_folder", "results")  # Default is "results" if not provided
-​
+input_folder = config.get("input_folder", "data")
+output_folder = config.get("output_folder", "results")
+
 # Detect all gene expression files in the input folder dynamically
 import os
 import glob
-​
+
 gene_expr_files = sorted(glob.glob(f"{input_folder}/*.tsv"))
 datasets = [os.path.splitext(os.path.basename(f))[0] for f in gene_expr_files]
-​
+
 rule all:
     input:
         expand(f"{output_folder}/{{dataset}}_heatmap.png", dataset=datasets),
-        expand(f"{output_folder}/{{dataset}}_umap.png", dataset=datasets)
-​
-# Step 1: Convert and rename files if necessary
-rule rename_files:
-    input:
-        gene_expr_dir=input_folder
-    output:
-        "renamed.complete"
-    script:
-        "scripts/rename_files.py"
-​
+        expand(f"{output_folder}/{{dataset}}_umap.png", dataset=datasets),
+        expand(f"{output_folder}/{{dataset}}_silhouette_plot.png", dataset=datasets),
+        expand(f"{output_folder}/{{dataset}}_resolution_silhouette_plot.png", dataset=datasets),
+
 # Step 2: Run ARACNe3 to generate networks
 rule run_aracne3:
     input:
@@ -52,7 +45,7 @@ rule run_aracne3:
         -o {output}/{{wildcards.dataset}}_consolidated-net_defaultid \
         -x 10 --alpha 0.05 --threads 1
         """
-​
+
 # Step 3: Convert ARACNe3 output to formatted networks
 rule format_network:
     input:
@@ -61,7 +54,7 @@ rule format_network:
         formatted_network=f"{output_folder}/{{dataset}}_consolidated-net_defaultid_formatted_network.tsv"
     script:
         "scripts/format_network.py"
-​
+
 # Step 4: Load and preprocess data for VIPER
 rule load_and_preprocess:
     input:
@@ -72,7 +65,7 @@ rule load_and_preprocess:
         processed_net=f"{output_folder}/{{dataset}}_processed_net.pkl"
     script:
         "scripts/load_and_preprocess.py"
-​
+
 # Step 5: VIPER analysis and PCA
 rule viper_and_pca_analysis:
     input:
@@ -80,9 +73,11 @@ rule viper_and_pca_analysis:
         processed_net=f"{output_folder}/{{dataset}}_processed_net.pkl"
     output:
         prot_act_pca=f"{output_folder}/{{dataset}}_prot_act_pca.h5ad"
+    conda:
+        "environment.yml"  # Specify the conda environment
     script:
         "scripts/viper_and_pca_analysis.py"
-​
+
 # Step 6: Clustering and UMAP analysis
 rule clustering_and_umap:
     input:
@@ -90,10 +85,32 @@ rule clustering_and_umap:
     output:
         umap_data=f"{output_folder}/{{dataset}}_umap_data.h5ad",
         umap_plot=f"{output_folder}/{{dataset}}_umap.png"
+    conda:
+        "environment.yml"
     script:
         "scripts/clustering_and_umap.py"
-​
-# Step 7: Generate Heatmap
+
+# Step 7: Optimize resolution and generate silhouette plot for resolution vs score
+rule resolution_optimization:
+    input:
+        processed_expr=f"{output_folder}/{{dataset}}_processed_expr.h5ad"
+    output:
+        silhouette_resolution_plot=f"{output_folder}/{{dataset}}_resolution_silhouette_plot.png",
+        best_resolution=f"{output_folder}/{{dataset}}_best_resolution.txt"
+    script:
+        "scripts/resolution_optimization.py"
+
+# Step 8: Generate Silhouette Plot
+rule silhouette_plot:
+    input:
+        umap_data=f"{output_folder}/{{dataset}}_umap_data.h5ad",
+        best_resolution=f"{output_folder}/{{dataset}}_best_resolution.txt"
+    output:
+        silhouette_plot=f"{output_folder}/{{dataset}}_silhouette_plot.png"
+    script:
+        "scripts/silhouette_plot.py"
+
+# Step 9: Generate Heatmap
 rule integration_and_heatmap:
     input:
         umap_data=f"{output_folder}/{{dataset}}_umap_data.h5ad"
@@ -110,26 +127,16 @@ rule integration_and_heatmap:
 
 Purpose: This is a meta-rule that defines the final outputs of the entire workflow. It ensures that all required steps have been completed and all outputs have been generated successfully.
 
-Outputs:
-· Heatmap images for each dataset (```results/{dataset}_heatmap.png```).
-· UMAP plot images for each dataset (```results/{dataset}_umap.png```).
+Inputs:
+· Heatmap (results/{dataset}_heatmap.png)
+· UMAP plot (results/{dataset}_umap.png)
+· Silhouette plot (results/{dataset}_silhouette_plot.png)
+· Resolution-based silhouette plot (results/{dataset}_resolution_silhouette_plot.png)
 
 Functionality: Acts as the endpoint to verify that all datasets have been processed through the pipeline.
 
-2.rename_files:
 
-Purpose: This optional step standardizes the names and formats of gene expression files in the data directory to ensure consistency.
-
-Inputs:
-· The directory containing all the gene expression files (```gene_expr_dir="data"```).
-
-Outputs:
-
-A completion flag file (```renamed.complete```) to indicate that all files have been renamed and formatted correctly.
-
-Script: ```scripts/rename_files.py``` is used to perform the renaming and formatting operations.
-
-3.run_aracne3:
+2.run_aracne3:
 
 Purpose: Executes ARACNe3, a tool for inferring gene regulatory networks, using gene expression data and a combined regulators file.
 
@@ -144,7 +151,7 @@ A directory containing the ARACNe3 consolidated network output (```results/{data
 
 Shell Command: Runs the ARACNe3 executable with specified parameters to generate the network.
 
-4.format_network:
+3.format_network:
 
 Purpose: Converts the output from ARACNe3 into a format that is compatible with PyViper for subsequent analysis.
 
@@ -156,7 +163,7 @@ A formatted network file (```results/{dataset}_consolidated-net_defaultid_format
 
 Script: Uses ```scripts/format_network.py``` to format the network data into a usable structure for PyViper.
 
-5.load_and_preprocess:
+4.load_and_preprocess:
 
 Purpose: Loads gene expression data and formatted network data, and performs preprocessing necessary for downstream VIPER analysis.
 
@@ -171,7 +178,7 @@ Outputs:
 
 Script: Executes ```scripts/load_and_preprocess.py``` to preprocess the data.
 
-6. viper_and_pca_analysis:
+5. viper_and_pca_analysis:
 
 Purpose: Conducts VIPER analysis to infer protein activity from gene expression data and applies PCA for dimensionality reduction.
 
@@ -183,7 +190,7 @@ Outputs:
 Protein activity PCA data (```results/{dataset}_prot_act_pca.h5ad```).
 Script: Runs ```scripts/viper_and_pca_analysis.py``` to perform VIPER and PCA analysis..
 
-7. clustering_and_umap:
+6. clustering_and_umap:
 
 Purpose: Performs clustering analysis and generates UMAP visualizations to visualize the data in two-dimensional space.
 
@@ -198,9 +205,39 @@ UMAP plot image (```results/{dataset}_umap.png```).
 
 Script: Executes ```clustering_and_umap.py``` to perform clustering and generate UMAP plots.
 
-8. integration_and_heatmap:
+7. resolution_optimization:
 
-Purpose: Integrates the results from UMAP and clustering steps and generates a heatmap to visualize protein activity across clusters.
+Purpose: Optimizes the clustering resolution by calculating silhouette scores across different resolution values and identifies the best resolution.
+
+Inputs:
+
+Processed expression data (results/{dataset}_processed_expr.h5ad)
+
+Outputs:
+
+Silhouette resolution plot (results/{dataset}_resolution_silhouette_plot.png)
+Best resolution value (results/{dataset}_best_resolution.txt)
+
+Script: Runs a Python script (scripts/resolution_optimization.py) to compute silhouette scores and determine the optimal clustering resolution.
+
+8. silhouette_plot:
+
+Purpose: Generates a silhouette plot based on the best resolution from the resolution_optimization step, providing a measure of cluster quality.
+
+Inputs:
+
+UMAP data (results/{dataset}_umap_data.h5ad)
+Best resolution value (results/{dataset}_best_resolution.txt)
+
+Outputs:
+
+Silhouette plot (results/{dataset}_silhouette_plot.png)
+
+Script: Runs a Python script (scripts/silhouette_plot.py) to create a silhouette plot based on the optimized clustering resolution.
+
+9. integration_and_heatmap:
+
+Purpose: Generates a heatmap based on the UMAP clustering and processed expression data to visualize gene expression across different cell types or clusters.
 
 Inputs:
 UMAP data (```results/{dataset}_umap_data.h5ad```).
@@ -208,56 +245,15 @@ UMAP data (```results/{dataset}_umap_data.h5ad```).
 Outputs:
 
 Final heatmap image (```results/{dataset}_heatmap.png```).
+
 Script: Runs ```scripts/integration_and_heatmap.py``` to create a heatmap visualization.
 
 
-## Code Part
+## Scripts Part
 
-## 1. rename files
 
-```
-import os
-import glob
-import pandas as pd
 
-# Define the data directory
-data_dir = "/Users/lzy/Desktop/Final/data"
-
-# Get all files in the directory (excluding those already in TSV format)
-files = sorted(glob.glob(os.path.join(data_dir, "*")))
-tsv_files = [f for f in files if f.endswith('.tsv')]
-
-# Iterate over each file and convert to TSV format if necessary
-for file_path in files:
-    if file_path in tsv_files:
-        print(f"File {file_path} is already in TSV format. Skipping conversion.")
-        continue
-
-    # Read the file
-    try:
-        # Assume the file is in CSV format or another format separated by commas
-        df = pd.read_csv(file_path, sep=None, engine='python')
-        
-        # Get the base name of the file (without the extension)
-        base_name = os.path.splitext(os.path.basename(file_path))[0]
-        
-        # Generate the new TSV file path
-        new_name = os.path.join(data_dir, f"{base_name}.tsv")
-        
-        # Save the data as a TSV file
-        df.to_csv(new_name, sep='\t', index=False)
-        print(f"Converted {file_path} to {new_name}.")
-        
-        # Delete the original file
-        os.remove(file_path)
-        print(f"Deleted original file {file_path}.")
-    except Exception as e:
-        print(f"Error processing {file_path}: {e}")
-
-print("All files have been successfully converted to TSV format and original files have been deleted.")
-```
-
-## 2. format_network
+## 1. format_network
 Shell code:
 ```
         /Users/lzy/Desktop/ARACNe3/build/src/app/ARACNe3_app_release \
@@ -305,7 +301,7 @@ for subdir in subdirs:
 
 ```
 
-## 3. load_and_preprocess
+## 2. load_and_preprocess
 
 
 ```
@@ -331,7 +327,7 @@ if __name__ == "__main__":
     load_and_preprocess(snakemake.input.gene_expr, snakemake.input.formatted_network, snakemake.output.processed_expr, snakemake.output.processed_net)
 ```
 
-##  4. Viper and pca analysis
+##  3. Viper and pca analysis
 
 ```
 import scanpy as sc
@@ -354,41 +350,177 @@ if __name__ == "__main__":
     ProtAct_NaRnEA.write_h5ad(snakemake.output.prot_act_pca)
 ```
 
-##  5. UMAP and Clustering
+##  4. UMAP and Clustering
 
 ```
 import scanpy as sc
 import matplotlib.pyplot as plt
+from sklearn.metrics import silhouette_score
 import os
 
 def perform_clustering_and_umap(input_file, output_file, output_figure):
+    # Load the input data
     data = sc.read_h5ad(input_file)
     
     # Perform neighborhood analysis, clustering, and UMAP
-    sc.pp.neighbors(data, n_neighbors=20, n_pcs=50)
-    sc.tl.leiden(data, resolution=0.1)
+    sc.pp.neighbors(data, n_neighbors=15, n_pcs=50)
+    sc.tl.leiden(data, resolution=0.5)
     sc.tl.umap(data)
 
+    # Calculate silhouette score
+    if 'leiden' in data.obs:
+        silhouette_avg = silhouette_score(data.obsm['X_umap'], data.obs['leiden'])
+        print(f"Silhouette Score: {silhouette_avg}")
+    else:
+        print("Leiden clustering not found in data.obs")
+
+    # Save the UMAP data
+    data.write_h5ad(output_file)
+    
     # Ensure the output directory exists
     os.makedirs(os.path.dirname(output_figure), exist_ok=True)
-
+    
     # Save the UMAP plot
-    sc.pl.umap(data, color='leiden', show=False, save=False)  # Generate the plot without directly saving it
-    plt.savefig(output_figure)  # Save using matplotlib to ensure the path is correct
+    sc.pl.umap(data, color='leiden', show=False)  # Plot without saving
+    
+    # Save the plot using matplotlib
+    plt.savefig(output_figure)  # Explicitly save the figure to the path
     plt.close()
-
-    # Save the processed data
-    data.write_h5ad(output_file)
 
 if __name__ == "__main__":
     perform_clustering_and_umap(
-        snakemake.input.prot_act_pca, 
-        snakemake.output.umap_data, 
-        snakemake.output.umap_plot
+        snakemake.input[0],  # Input data file
+        snakemake.output[0],  # Output UMAP data
+        snakemake.output[1]   # Output UMAP figure
     )
 
 ```
-##  6. Heatmap Generation
+
+
+
+##  5. Optimize resolution and generate silhouette plot for resolution vs score
+
+```
+import scanpy as sc
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.metrics import silhouette_score
+
+def optimize_resolution(adata, resolutions, n_neighbors=15):
+    scores = []
+    for res in resolutions:
+        sc.pp.neighbors(adata, n_neighbors=n_neighbors)
+        sc.tl.leiden(adata, resolution=res)
+        
+        if len(adata.obs['leiden'].unique()) > 1:
+            score = silhouette_score(adata.obsm['X_pca'], adata.obs['leiden'])
+            scores.append(score)
+        else:
+            scores.append(-1)  # Append -1 if only one cluster is found
+
+    return scores
+
+# Load the processed expression data
+adata = sc.read_h5ad(snakemake.input.processed_expr)
+
+# Define a range of resolutions to test
+resolutions = np.linspace(0.1, 1.0, 10)
+
+# Optimize silhouette score across resolutions
+silhouette_scores = optimize_resolution(adata, resolutions)
+
+# Find the best resolution based on the highest silhouette score
+best_resolution = resolutions[np.argmax(silhouette_scores)]
+
+# Save the best resolution to a file
+with open(snakemake.output.best_resolution, 'w') as f:
+    f.write(f"Best resolution: {best_resolution}\n")
+
+# Plot the silhouette scores vs. resolution
+plt.errorbar(resolutions, silhouette_scores, yerr=None, fmt='-o')
+plt.xlabel('Resolution')
+plt.ylabel('Silhouette Score')
+plt.title(f"Best resolution = {best_resolution:.2f}")
+plt.savefig(snakemake.output.silhouette_resolution_plot)
+plt.close()
+```
+
+##  6. Generate Silhouette Plot
+
+```
+import scanpy as sc
+import matplotlib.pyplot as plt
+from sklearn.metrics import silhouette_samples, silhouette_score
+import numpy as np
+import os
+
+def generate_silhouette_plot(input_file, output_file):
+    # Load the input data
+    data = sc.read_h5ad(input_file)
+
+    # Ensure 'leiden' clusters exist
+    if 'leiden' not in data.obs:
+        print("Leiden clustering not found, performing clustering...")
+        sc.pp.neighbors(data, n_neighbors=15, n_pcs=50)
+        sc.tl.leiden(data, resolution=0.5)
+
+    # Calculate silhouette scores for each cell
+    if 'leiden' in data.obs:
+        labels = data.obs['leiden'].astype(int)
+        X = data.obsm['X_umap']  # UMAP embedding
+
+        # Compute silhouette scores for each cell
+        silhouette_vals = silhouette_samples(X, labels)
+
+        # Calculate the average silhouette score
+        silhouette_avg = np.mean(silhouette_vals)
+        print(f"Average Silhouette Score: {silhouette_avg}")
+
+        # Create silhouette plot for each cluster
+        fig, ax = plt.subplots(figsize=(10, 6))
+
+        y_lower, y_upper = 0, 0
+        unique_labels = np.unique(labels)
+        for i, label in enumerate(unique_labels):
+            # Aggregate silhouette scores for the cluster
+            ith_silhouette_vals = silhouette_vals[labels == label]
+            ith_silhouette_vals.sort()
+
+            size_cluster_i = ith_silhouette_vals.shape[0]
+            y_upper = y_lower + size_cluster_i
+
+            color = plt.cm.nipy_spectral(float(i) / len(unique_labels))
+            ax.fill_betweenx(np.arange(y_lower, y_upper), 0, ith_silhouette_vals,
+                             facecolor=color, edgecolor=color, alpha=0.7)
+
+            ax.text(-0.05, y_lower + 0.5 * size_cluster_i, str(label))
+
+            y_lower = y_upper  # Update y_lower for the next cluster
+
+        ax.set_title(f"Silhouette Plot (Avg: {silhouette_avg:.3f})")
+        ax.set_xlabel("Silhouette Coefficient")
+        ax.set_ylabel("Cluster")
+
+        # Draw vertical line for average silhouette score
+        ax.axvline(x=silhouette_avg, color="red", linestyle="--")
+
+        # Save the silhouette plot
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
+        plt.savefig(output_file)
+        plt.close()
+
+    else:
+        print("Leiden clustering not available in the dataset.")
+
+if __name__ == "__main__":
+    # Replace these with Snakemake input/output or other parameters
+    input_file = snakemake.input[0]
+    output_file = snakemake.output[0]
+    
+    generate_silhouette_plot(input_file, output_file)
+```
+
+##  7. Heatmap Generation
 
 ```
 import scanpy as sc
@@ -406,13 +538,13 @@ def generate_heatmap(data_path, output_path, N=50):
     data.X = np.where(data.X <= 0, np.min(data.X[data.X > 0]), data.X)
     
     try:
-        # 选择前 N 个最活跃的蛋白质
+        # Select the top N most active proteins
         protein_set = data.var_names[:N]
         
-        # 创建热图
+        # Create Heatmap
         pyviper.pl.heatmap(data, var_names=protein_set, groupby="leiden", vcenter=0, cmap="RdBu_r", swap_axes=True, show=False)
         
-        # 保存图像
+        # Save plot
         plt.savefig(output_path, bbox_inches="tight")
         plt.close()
         
@@ -430,29 +562,12 @@ bash code:
 snakemake --cores 1 --snakefile Snakefile2
 
 ```
+Example Visulization:
 
-![gene_expression_sub_10_umap](https://github.com/user-attachments/assets/a3b62ed8-57a8-4b0a-b81f-4cb02f9e291e)
-![gene_expression_sub_10_heatmap](https://github.com/user-attachments/assets/beec4387-0ce3-4e98-87c7-d240ed13ccd9)
-![gene_expression_sub_9_umap](https://github.com/user-attachments/assets/05740084-328b-4fd3-a491-3cedc4947818)
-![gene_expression_sub_9_heatmap](https://github.com/user-attachments/assets/b2e89743-4606-404c-960d-5eebcef986d9)
-![gene_expression_sub_8_umap](https://github.com/user-attachments/assets/175a4dd1-5a0c-403c-81a6-f0e8f08e6b7e)
-![gene_expression_sub_8_heatmap](https://github.com/user-attachments/assets/8689d8d6-e006-45cf-9249-f0c771b0eace)
-![gene_expression_sub_7_umap](https://github.com/user-attachments/assets/f364b470-6511-45c8-b87e-ac123c86e794)
-![gene_expression_sub_7_heatmap](https://github.com/user-attachments/assets/e65449a8-3191-4e44-b0da-05158304b8cf)
-![gene_expression_sub_6_umap](https://github.com/user-attachments/assets/bc01af72-158e-4f79-82cf-994114d9a2ef)
-![gene_expression_sub_6_heatmap](https://github.com/user-attachments/assets/9d3c6d4b-b56d-4791-870d-6402fe6e6bfe)
-![gene_expression_sub_5_umap](https://github.com/user-attachments/assets/3b2a9286-3ac8-437d-b179-25732e8b6a1b)
-![gene_expression_sub_5_heatmap](https://github.com/user-attachments/assets/c244688e-a18e-429c-bd7f-30615060d655)
-![gene_expression_sub_4_umap](https://github.com/user-attachments/assets/57904012-f296-4a0a-acc5-d4af54d0d96e)
-![gene_expression_sub_4_heatmap](https://github.com/user-attachments/assets/f1a0f520-51a2-4b9c-aaf2-dc3c71ecdb1a)
-![gene_expression_sub_3_umap](https://github.com/user-attachments/assets/2c4d882a-3fd0-4004-97c6-e2058ca6fe2d)
-![gene_expression_sub_3_heatmap](https://github.com/user-attachments/assets/bf523060-c414-4169-8e0a-5b8bcdaf5ae7)
-![gene_expression_sub_2_umap](https://github.com/user-attachments/assets/a146ea29-7f3c-4460-8824-75bdb5772742)
-![gene_expression_sub_2_heatmap](https://github.com/user-attachments/assets/2f54a6f3-95d3-4c3e-bb7f-e5c920923fef)
-![gene_expression_sub_1_umap](https://github.com/user-attachments/assets/45c4497b-414a-457d-bd7b-34b8c0e13cb9)
-![gene_expression_sub_1_heatmap](https://github.com/user-attachments/assets/a802e9dd-13c3-42d3-956e-cab610f87b1c)
-
-
+![gene_expression_sub_1_heatmap](https://github.com/user-attachments/assets/1f7c4850-1f9b-47ce-b0f8-b9c816c8804b)
+![gene_expression_sub_1_resolution_silhouette_plot](https://github.com/user-attachments/assets/6e15029c-2b92-43e9-8e4f-2fc028cc198e)
+![gene_expression_sub_1_silhouette_plot](https://github.com/user-attachments/assets/4cdf0b49-7925-473e-ac1e-b331663861ff)
+![gene_expression_sub_1_umap](https://github.com/user-attachments/assets/bf7d8bfc-966a-4c43-b055-6d230464e6e2)
 
 
 
