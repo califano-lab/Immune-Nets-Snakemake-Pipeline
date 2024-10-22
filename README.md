@@ -256,6 +256,8 @@ Script: Runs ```scripts/integration_and_heatmap.py``` to create a heatmap visual
 ## 1. format_network
 Shell code:
 ```
+python python scripts/generate_h5ad.py
+
         /Users/lzy/Desktop/ARACNe3/build/src/app/ARACNe3_app_release \
         -e {input.expr_matrix} \
         -r {input.regulators} \
