@@ -12,110 +12,94 @@ Snakemake is a workflow management system that allows you to create reproducible
 ## Pipeline Overview
 
 ```
-# Read input and output folder from config or command-line arguments
-input_folder = config.get("input_folder", "data")
-output_folder = config.get("output_folder", "results")
-
-# Detect all gene expression files in the input folder dynamically
 import os
 import glob
 
-gene_expr_files = sorted(glob.glob(f"{input_folder}/*.tsv"))
+# Step 1: Detect all gene expression files in the input folder dynamically
+gene_expr_files = sorted(glob.glob("data/gene_expression_sub_*.tsv"))
 datasets = [os.path.splitext(os.path.basename(f))[0] for f in gene_expr_files]
 
+# Step 2: Define the final targets of the workflow
 rule all:
     input:
-        expand(f"{output_folder}/{{dataset}}_heatmap.png", dataset=datasets),
-        expand(f"{output_folder}/{{dataset}}_umap.png", dataset=datasets),
-        expand(f"{output_folder}/{{dataset}}_silhouette_plot.png", dataset=datasets),
-        expand(f"{output_folder}/{{dataset}}_resolution_silhouette_plot.png", dataset=datasets),
+        expand("results/{dataset}_umap/clustering_umap.h5ad", dataset=datasets),
+        expand("results/{dataset}_umap/umap_plot.png", dataset=datasets),
+        expand("results/{dataset}_protein_activity/prot_act_pca.h5ad", dataset=datasets),
+        expand("results/{dataset}_silhouette/silhouette_plot.png", dataset=datasets),
+        expand("results/{dataset}_heatmap/integrated_heatmap.png", dataset=datasets)
 
-# Step 2: Run ARACNe3 to generate networks
-rule run_aracne3:
-    input:
-        expr_matrix=f"{input_folder}/{{dataset}}.tsv",
-        regulators="combined_regulators.txt"
-    output:
-        directory(f"{output_folder}/{{dataset}}_consolidated-net_defaultid")
-    shell:
-        """
-        /Users/lzy/Desktop/ARACNe3/build/src/app/ARACNe3_app_release \
-        -e {input.expr_matrix} \
-        -r {input.regulators} \
-        -o {output}/{{wildcards.dataset}}_consolidated-net_defaultid \
-        -x 10 --alpha 0.05 --threads 1
-        """
-
-# Step 3: Convert ARACNe3 output to formatted networks
-rule format_network:
-    input:
-        aracne_output=f"{output_folder}/{{dataset}}_consolidated-net_defaultid/consolidated-net_defaultid.tsv"
-    output:
-        formatted_network=f"{output_folder}/{{dataset}}_consolidated-net_defaultid_formatted_network.tsv"
-    script:
-        "scripts/format_network.py"
-
-# Step 4: Load and preprocess data for VIPER
+# Step 3: Load and preprocess gene expression data
 rule load_and_preprocess:
     input:
-        gene_expr=f"{input_folder}/{{dataset}}.tsv",
-        formatted_network=f"{output_folder}/{{dataset}}_consolidated-net_defaultid_formatted_network.tsv"
+        gene_expr="data/{dataset}.tsv"
     output:
-        processed_expr=f"{output_folder}/{{dataset}}_processed_expr.h5ad",
-        processed_net=f"{output_folder}/{{dataset}}_processed_net.pkl"
+        "results/{dataset}_preprocessed_data.h5ad"
     script:
         "scripts/load_and_preprocess.py"
 
-# Step 5: VIPER analysis and PCA
+# Step 4: Run ARACNe3 to generate gene regulatory networks
+rule run_aracne3:
+    input:
+        expr_matrix="data/{dataset}.tsv",
+        regulators="combined_regulators.txt"
+    output:
+        consolidated_net="results/{dataset}_consolidated_net/consolidated_net.tsv"
+    shell:
+        "/Users/lzy/Desktop/ARACNe3/build/src/app/ARACNe3_app_release -e {input.expr_matrix} -r {input.regulators} -o results/{wildcards.dataset}_consolidated_net -x 10 --alpha 0.05 --threads 1"
+
+# Step 5: Format ARACNe3 output into a compatible format for downstream analysis
+rule format_network:
+    input:
+        aracne_output="results/{dataset}_consolidated_net/consolidated_net.tsv"
+    output:
+        formatted_network="results/{dataset}_consolidated_net/formatted_network.tsv"
+    script:
+        "scripts/format_network.py"
+
+# Step 6: VIPER analysis and PCA
 rule viper_and_pca_analysis:
     input:
-        processed_expr=f"{output_folder}/{{dataset}}_processed_expr.h5ad",
-        processed_net=f"{output_folder}/{{dataset}}_processed_net.pkl"
+        processed_expr="results/{dataset}_preprocessed_data.h5ad",
+        processed_net="results/{dataset}_consolidated_net/formatted_network.tsv"
     output:
-        prot_act_pca=f"{output_folder}/{{dataset}}_prot_act_pca.h5ad"
-    conda:
-        "environment.yml"  # Specify the conda environment
+        prot_act_pca="results/{dataset}_protein_activity/prot_act_pca.h5ad"
     script:
         "scripts/viper_and_pca_analysis.py"
 
-# Step 6: Clustering and UMAP analysis
+# Step 7: Clustering and UMAP visualization
 rule clustering_and_umap:
     input:
-        prot_act_pca=f"{output_folder}/{{dataset}}_prot_act_pca.h5ad"
+        "results/{dataset}_protein_activity/prot_act_pca.h5ad"
     output:
-        umap_data=f"{output_folder}/{{dataset}}_umap_data.h5ad",
-        umap_plot=f"{output_folder}/{{dataset}}_umap.png"
-    conda:
-        "environment.yml"
+        "results/{dataset}_umap/clustering_umap.h5ad",
+        "results/{dataset}_umap/umap_plot.png"
     script:
         "scripts/clustering_and_umap.py"
 
-# Step 7: Optimize resolution and generate silhouette plot for resolution vs score
+# Step 8: Optimize resolution for clustering
 rule resolution_optimization:
     input:
-        processed_expr=f"{output_folder}/{{dataset}}_processed_expr.h5ad"
+        "results/{dataset}_preprocessed_data.h5ad"
     output:
-        silhouette_resolution_plot=f"{output_folder}/{{dataset}}_resolution_silhouette_plot.png",
-        best_resolution=f"{output_folder}/{{dataset}}_best_resolution.txt"
+        "results/{dataset}_optimization/optimized_resolution.txt"
     script:
         "scripts/resolution_optimization.py"
 
-# Step 8: Generate Silhouette Plot
+# Step 9: Generate silhouette plot
 rule silhouette_plot:
     input:
-        umap_data=f"{output_folder}/{{dataset}}_umap_data.h5ad",
-        best_resolution=f"{output_folder}/{{dataset}}_best_resolution.txt"
+        "results/{dataset}_umap/clustering_umap.h5ad"
     output:
-        silhouette_plot=f"{output_folder}/{{dataset}}_silhouette_plot.png"
+        "results/{dataset}_silhouette/silhouette_plot.png"
     script:
         "scripts/silhouette_plot.py"
 
-# Step 9: Generate Heatmap
+# Step 10: Generate heatmap of integrated data
 rule integration_and_heatmap:
     input:
-        umap_data=f"{output_folder}/{{dataset}}_umap_data.h5ad"
+        "results/{dataset}_protein_activity/prot_act_pca.h5ad"
     output:
-        heatmap=f"{output_folder}/{{dataset}}_heatmap.png"
+        "results/{dataset}_heatmap/integrated_heatmap.png"
     script:
         "scripts/integration_and_heatmap.py"
 ```
