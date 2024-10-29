@@ -685,11 +685,36 @@ snakemake --cores 1 --snakefile Snakefile2
 
 ```
 Example Visulization:
+![systemic_lupus_erythematosus_gene_expression_2000cells_2000genes_transposed_umap](https://github.com/user-attachments/assets/5a8415fd-cca3-4a0d-b9f6-3c6406fd1b5f)
+![systemic_lupus_erythematosus_gene_expression_2000cells_2000genes_transposed_silhouette_plot](https://github.com/user-attachments/assets/7281edaa-d1de-4248-b5fc-025458f24206)
+![systemic_lupus_erythematosus_gene_expression_2000cells_2000genes_transposed_resolution_silhouette_plot](https://github.com/user-attachments/assets/4a9a6df3-f54e-4c5d-b62a-ee8a4c7ed632)
+![systemic_lupus_erythematosus_gene_expression_2000cells_2000genes_transposed_heatmap](https://github.com/user-attachments/assets/41389a6c-bc15-4b00-98e7-75cac7dd8817)
+![multiple_sclerosis_gene_expression_2000cells_2000genes_transposed_umap](https://github.com/user-attachments/assets/df1c2128-287e-4e82-86a1-c844b7b2596e)
+![multiple_sclerosis_gene_expression_2000cells_2000genes_transposed_silhouette_plot](https://github.com/user-attachments/assets/d2e3e04f-ed9c-4ebe-868a-cb6e8d04b777)
+![multiple_sclerosis_gene_expression_2000cells_2000genes_transposed_resolution_silhouette_plot](https://github.com/user-attachments/assets/aa274008-2d8a-4f5f-8097-1cae73f7175d)
+![multiple_sclerosis_gene_expression_2000cells_2000genes_transposed_heatmap](https://github.com/user-attachments/assets/4096455d-ee38-4c6a-b90a-e7973e3a9ae6)
+![lung_adenocarcinoma_gene_expression_2000cells_2000genes_transposed_umap](https://github.com/user-attachments/assets/127d1f0f-a956-49a4-8a85-3a60e1783155)
+![lung_adenocarcinoma_gene_expression_2000cells_2000genes_transposed_silhouette_plot](https://github.com/user-attachments/assets/64851b3e-7422-4aff-8dfa-e2a9ed0d0f39)
+![lung_adenocarcinoma_gene_expression_2000cells_2000genes_transposed_resolution_silhouette_plot](https://github.com/user-attachments/assets/7e88c43c-4d81-4a08-95c9-53c272483d71)
+![lung_adenocarcinoma_gene_expression_2000cells_2000genes_transposed_heatmap](https://github.com/user-attachments/assets/75cd0022-89c5-4e55-a9d2-bd1fa9e1d36d)
+![common_variable_immunodeficiency_gene_expression_2000cells_2000genes_transposed_umap](https://github.com/user-attachments/assets/0ca16053-6e48-4742-b133-086013c2f4be)
+![common_variable_immunodeficiency_gene_expression_2000cells_2000genes_transposed_silhouette_plot](https://github.com/user-attachments/assets/cedbf9ed-b75e-444a-b7c1-b991cc42f1ba)
+![common_variable_immunodeficiency_gene_expression_2000cells_2000genes_transposed_resolution_silhouette_plot](https://github.com/user-attachments/assets/85419a53-c5c8-4d41-a9ee-92a4ffe5d4fe)
+![common_variable_immunodeficiency_gene_expression_2000cells_2000genes_transposed_heatmap](https://github.com/user-attachments/assets/424da127-7cb0-48ec-8e0b-0025785cd2b1)
+![breast_cancer_gene_expression_2000cells_2000genes_transposed_umap](https://github.com/user-attachments/assets/d58a6fd8-d92a-4cb9-a1c4-06fed749298a)
+![breast_cancer_gene_expression_2000cells_2000genes_transposed_silhouette_plot](https://github.com/user-attachments/assets/c9fe259c-3758-4c71-a3bf-77de4501e9b4)
+![breast_cancer_gene_expression_2000cells_2000genes_transposed_resolution_silhouette_plot](https://github.com/user-attachments/assets/4768d2cc-c199-422b-be16-5ed399f16bde)
+![breast_cancer_gene_expression_2000cells_2000genes_transposed_heatmap](https://github.com/user-attachments/assets/36fdf243-035a-4553-a793-3f74a9eebc75)
+![B-cell_non-Hodgkin_lymphoma_gene_expression_2000cells_2000genes_transposed_umap](https://github.com/user-attachments/assets/a249beee-3546-4ed1-9dc1-ba9fcc356738)
+![B-cell_non-Hodgkin_lymphoma_gene_expression_2000cells_2000genes_transposed_silhouette_plot](https://github.com/user-attachments/assets/f9580b0d-7c0e-4005-9341-3f6a1b3420db)
+![B-cell_non-Hodgkin_lymphoma_gene_expression_2000cells_2000genes_transposed_resolution_silhouette_plot](https://github.com/user-attachments/assets/e1a75ee5-0e77-485d-8608-d183f6d8613e)
+![B-cell_non-Hodgkin_lymphoma_gene_expression_2000cells_2000genes_transposed_heatmap](https://github.com/user-attachments/assets/80a5ab57-2a41-44c2-816f-a5ed8dda58a3)
+![B-cell_acute_lymphoblastic_leukemia_gene_expression_2000cells_2000genes_transposed_umap](https://github.com/user-attachments/assets/43b70a95-40e6-431e-b23c-e0b7bd6d65bd)
+![B-cell_acute_lymphoblastic_leukemia_gene_expression_2000cells_2000genes_transposed_silhouette_plot](https://github.com/user-attachments/assets/bf9e4f18-b53f-40c7-a704-5ffa110a9c1f)
+![B-cell_acute_lymphoblastic_leukemia_gene_expression_2000cells_2000genes_transposed_resolution_silhouette_plot](https://github.com/user-attachments/assets/08ce92e4-52a1-4327-a104-ab93b299fa90)
+![B-cell_acute_lymphoblastic_leukemia_gene_expression_2000cells_2000genes_transposed_heatmap](https://github.com/user-attachments/assets/e5e880f0-5cb9-4825-8ef4-52786ad12db3)
 
-![gene_expression_sub_1_heatmap](https://github.com/user-attachments/assets/1f7c4850-1f9b-47ce-b0f8-b9c816c8804b)
-![gene_expression_sub_1_resolution_silhouette_plot](https://github.com/user-attachments/assets/6e15029c-2b92-43e9-8e4f-2fc028cc198e)
-![gene_expression_sub_1_silhouette_plot](https://github.com/user-attachments/assets/4cdf0b49-7925-473e-ac1e-b331663861ff)
-![gene_expression_sub_1_umap](https://github.com/user-attachments/assets/bf7d8bfc-966a-4c43-b055-6d230464e6e2)
+
 
 
 
