@@ -9,6 +9,102 @@ The goal of this pipeline is to process gene expression datasets and analyze the
 
 Snakemake is a workflow management system that allows you to create reproducible and scalable data analyses. Inspired by the Python programming language and the "Make" utility commonly used for build automation, Snakemake enables you to define complex workflows using simple rules that specify how input files are converted into output files.
 
+## Initial Setup: Gene Expression Data Generation
+The first step involves generating gene expression data from the Cellxgene Census for the following immune and tumor-related diseases:
+
+· B-cell acute lymphoblastic leukemia
+· B-cell non-Hodgkin lymphoma
+· Common variable immunodeficiency
+· Systemic lupus erythematosus
+· Multiple sclerosis
+· Breast cancer
+· Lung adenocarcinoma
+· For each disease, we retrieve up to 2000 cells and 2000 genes, saving this data in both .h5ad and transposed .tsv formats to ensure compatibility with downstream analysis steps.
+
+```
+import os
+import scanpy as sc
+import cellxgene_census
+import pandas as pd
+```
+```
+# Set the output directory to the 'data' folder inside the current directory (Final)
+output_dir = "data"  # This will save the files inside the 'data' folder within Final
+
+# Ensure the output directory exists
+os.makedirs(output_dir, exist_ok=True)
+
+# List of immune and tumor-related diseases
+immune_and_tumor_related_diseases = [
+    'B-cell acute lymphoblastic leukemia', 'B-cell non-Hodgkin lymphoma',
+    'common variable immunodeficiency', 'systemic lupus erythematosus',
+    'multiple sclerosis', 'breast cancer',
+    'lung adenocarcinoma']
+```
+```
+# Use the stable census version for consistency
+census_version = "2024-07-01"
+
+# Open the cellxgene census to retrieve gene expression data
+with cellxgene_census.open_soma(census_version=census_version) as census:
+
+    # Filter the metadata to include only cells from the specified diseases
+    value_filter = " or ".join([f"disease == '{d}'" for d in immune_and_tumor_related_diseases])
+
+    cell_metadata = cellxgene_census.get_obs(
+        census,
+        "homo_sapiens",
+        value_filter=value_filter,
+        column_names=["assay", "cell_type", "tissue", "disease"]
+    )
+
+    # Iterate over each disease and save a separate .h5ad and transposed .tsv file for each
+    for disease in immune_and_tumor_related_diseases:
+        filtered_data = cell_metadata[cell_metadata['disease'] == disease]
+
+        if filtered_data.shape[0] > 0:
+            print(f"Processing {disease} with {filtered_data.shape[0]} cells.")
+
+            # Select the first 2000 cells if available
+            selected_data = filtered_data.head(2000)
+
+            # Retrieve gene expression data as AnnData object for the selected cells
+            gene_expression_data = cellxgene_census.get_anndata(
+                census=census,
+                organism="homo_sapiens",
+                measurement_name="RNA",
+                X_name="raw",
+                obs_coords=selected_data.index.tolist()  # Use the selected cell list
+            )
+
+            # Select the first 2000 genes
+            gene_expression_data = gene_expression_data[:, :2000]
+
+            # Save the AnnData object as an .h5ad file, using the disease name in the filename
+            output_h5ad_file = os.path.join(output_dir, f"{disease.replace(' ', '_')}_gene_expression_2000cells_2000genes.h5ad")
+            gene_expression_data.write_h5ad(output_h5ad_file)
+
+            print(f"Gene expression data for {disease} (first 2000 cells and 2000 genes) saved to {output_h5ad_file}")
+
+            # Convert the .h5ad file to a DataFrame
+            expression_df = pd.DataFrame(
+                gene_expression_data.X.toarray(),
+                index=gene_expression_data.obs.index,
+                columns=gene_expression_data.var['feature_name']
+            )
+
+            # Transpose the DataFrame to have genes as rows and cells as columns
+            transposed_df = expression_df.T
+
+            # Save the transposed DataFrame as a .tsv file
+            output_tsv_file = os.path.join(output_dir, f"{disease.replace(' ', '_')}_gene_expression_2000cells_2000genes_transposed.tsv")
+            transposed_df.to_csv(output_tsv_file, sep='\t')
+
+            print(f"Gene expression data for {disease} (first 2000 cells and 2000 genes) saved as transposed TSV to {output_tsv_file}")
+
+print("All disease-specific datasets have been saved.")
+```
+
 ## Pipeline Overview
 
 ```
