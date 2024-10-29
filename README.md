@@ -13,13 +13,20 @@ Snakemake is a workflow management system that allows you to create reproducible
 The first step involves generating gene expression data from the Cellxgene Census for the following immune and tumor-related diseases:
 
 · B-cell acute lymphoblastic leukemia
+
 · B-cell non-Hodgkin lymphoma
+
 · Common variable immunodeficiency
+
 · Systemic lupus erythematosus
+
 · Multiple sclerosis
+
 · Breast cancer
+
 · Lung adenocarcinoma
-· For each disease, we retrieve up to 2000 cells and 2000 genes, saving this data in both .h5ad and transposed .tsv formats to ensure compatibility with downstream analysis steps.
+
+For each disease, we retrieve up to 2000 cells and 2000 genes, saving this data in both .h5ad and transposed .tsv formats to ensure compatibility with downstream analysis steps.
 
 1. Setup and Initialization
 This section sets up the output directory and the list of target diseases, and ensures the output directory is ready to store the data files.
