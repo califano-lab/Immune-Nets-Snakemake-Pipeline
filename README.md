@@ -300,14 +300,14 @@ Purpose: Optimizes the clustering resolution by calculating silhouette scores ac
 
 Inputs:
 
-Processed expression data (results/{dataset}_processed_expr.h5ad)
+Processed expression data (```results/{dataset}_processed_expr.h5ad```)
 
 Outputs:
 
-Silhouette resolution plot (results/{dataset}_resolution_silhouette_plot.png)
-Best resolution value (results/{dataset}_best_resolution.txt)
+Silhouette resolution plot (```results/{dataset}_resolution_silhouette_plot.png```)
+Best resolution value (```results/{dataset}_best_resolution.txt```)
 
-Script: Runs a Python script (scripts/resolution_optimization.py) to compute silhouette scores and determine the optimal clustering resolution.
+Script: Runs a Python script (```scripts/resolution_optimization.py```) to compute silhouette scores and determine the optimal clustering resolution.
 
 8. silhouette_plot:
 
@@ -315,14 +315,14 @@ Purpose: Generates a silhouette plot based on the best resolution from the resol
 
 Inputs:
 
-UMAP data (results/{dataset}_umap_data.h5ad)
-Best resolution value (results/{dataset}_best_resolution.txt)
+UMAP data (```results/{dataset}_umap_data.h5ad```)
+Best resolution value (```results/{dataset}_best_resolution.txt```)
 
 Outputs:
 
-Silhouette plot (results/{dataset}_silhouette_plot.png)
+Silhouette plot (```results/{dataset}_silhouette_plot.png```)
 
-Script: Runs a Python script (scripts/silhouette_plot.py) to create a silhouette plot based on the optimized clustering resolution.
+Script: Runs a Python script (```scripts/silhouette_plot.py```) to create a silhouette plot based on the optimized clustering resolution.
 
 9. integration_and_heatmap:
 
