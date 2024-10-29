@@ -431,9 +431,30 @@ def run_viper_and_pca(processed_expr_path, network_interactome_path):
     with open(network_interactome_path, 'rb') as f:
         network_interactome = pickle.load(f)
     
-    # Perform VIPER analysis and PCA
-    ProtAct_NaRnEA = pyviper.viper(gex_data=gene_expr_signature, interactome=network_interactome, enrichment="narnea", eset_filter=False, njobs=1, verbose=False)
-    pyviper.tl.pca(ProtAct_NaRnEA, layer="pes", zero_center=True, svd_solver='arpack', random_state=0)
+    # Perform VIPER analysis
+    ProtAct_NaRnEA = pyviper.viper(
+        gex_data=gene_expr_signature, 
+        interactome=network_interactome, 
+        enrichment="narnea", 
+        eset_filter=False, 
+        njobs=1, 
+        verbose=False
+    )
+    
+    # Print shape and feature details after VIPER analysis
+    num_samples, num_features = ProtAct_NaRnEA.shape
+    print(f"Shape after VIPER analysis: Samples: {num_samples}, Features: {num_features}")
+    
+    # Check if PCA can be performed
+    if num_features < 2:
+        print("Insufficient features for PCA. Skipping PCA step.")
+    else:
+        # Perform PCA with n_components set to minimum of samples, features, and a max of 50
+        n_components = min(num_samples, num_features, 50)
+        pyviper.tl.pca(
+            ProtAct_NaRnEA, layer="pes", n_comps=n_components, zero_center=True, svd_solver='arpack', random_state=0
+        )
+    
     return ProtAct_NaRnEA
 
 if __name__ == "__main__":
