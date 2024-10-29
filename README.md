@@ -21,13 +21,14 @@ The first step involves generating gene expression data from the Cellxgene Censu
 · Lung adenocarcinoma
 · For each disease, we retrieve up to 2000 cells and 2000 genes, saving this data in both .h5ad and transposed .tsv formats to ensure compatibility with downstream analysis steps.
 
+1. Setup and Initialization
+This section sets up the output directory and the list of target diseases, and ensures the output directory is ready to store the data files.
 ```
 import os
 import scanpy as sc
 import cellxgene_census
 import pandas as pd
-```
-```
+
 # Set the output directory to the 'data' folder inside the current directory (Final)
 output_dir = "data"  # This will save the files inside the 'data' folder within Final
 
@@ -41,6 +42,8 @@ immune_and_tumor_related_diseases = [
     'multiple sclerosis', 'breast cancer',
     'lung adenocarcinoma']
 ```
+2. Connecting to Cellxgene Census and Filtering Metadata
+In this part, we connect to the cellxgene census, apply a filter to retrieve metadata for only the diseases of interest, and format a filter string to apply for efficient retrieval.
 ```
 # Use the stable census version for consistency
 census_version = "2024-07-01"
@@ -57,7 +60,10 @@ with cellxgene_census.open_soma(census_version=census_version) as census:
         value_filter=value_filter,
         column_names=["assay", "cell_type", "tissue", "disease"]
     )
-
+```
+3. Processing and Saving Gene Expression Data for Each Disease
+This section loops through each disease, retrieves and filters gene expression data, and saves it in .h5ad format.
+```
     # Iterate over each disease and save a separate .h5ad and transposed .tsv file for each
     for disease in immune_and_tumor_related_diseases:
         filtered_data = cell_metadata[cell_metadata['disease'] == disease]
@@ -85,7 +91,10 @@ with cellxgene_census.open_soma(census_version=census_version) as census:
             gene_expression_data.write_h5ad(output_h5ad_file)
 
             print(f"Gene expression data for {disease} (first 2000 cells and 2000 genes) saved to {output_h5ad_file}")
-
+```
+4. Convert and Save Gene Expression Data as Transposed TSV
+This final part converts the saved .h5ad file to a transposed .tsv format and saves it, enabling easier integration into workflows that require gene-centric data organization.
+```
             # Convert the .h5ad file to a DataFrame
             expression_df = pd.DataFrame(
                 gene_expression_data.X.toarray(),
