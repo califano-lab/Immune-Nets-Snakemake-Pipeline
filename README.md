@@ -217,10 +217,10 @@ rule integration_and_heatmap:
 Purpose: This is a meta-rule that defines the final outputs of the entire workflow. It ensures that all required steps have been completed and all outputs have been generated successfully.
 
 Inputs:
-· Heatmap (results/{dataset}_heatmap.png)
-· UMAP plot (results/{dataset}_umap.png)
-· Silhouette plot (results/{dataset}_silhouette_plot.png)
-· Resolution-based silhouette plot (results/{dataset}_resolution_silhouette_plot.png)
+· Heatmap (```results/{dataset}_heatmap.png```)
+· UMAP plot (```results/{dataset}_umap.png```)
+· Silhouette plot (```results/{dataset}_silhouette_plot.png```)
+· Resolution-based silhouette plot (```results/{dataset}_resolution_silhouette_plot.png```)
 
 Functionality: Acts as the endpoint to verify that all datasets have been processed through the pipeline.
 
