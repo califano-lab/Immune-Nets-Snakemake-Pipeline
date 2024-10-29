@@ -365,10 +365,13 @@ import pandas as pd
 input_root_dir = "results"
 output_root_dir = "results"
 
-# Retrieve all subdirectories, assuming all subdirectory names start with "gene_expression_sub_"
-subdirs = sorted([d for d in os.listdir(input_root_dir) if d.startswith("gene_expression_sub_")])
+# Retrieve all subdirectories, assuming all subdirectory names contain "_consolidated-net_defaultid"
+subdirs = sorted([d for d in os.listdir(input_root_dir) if d.endswith("_consolidated-net_defaultid")])
+
+print("Subdirectories found:", subdirs)  # Print the found subdirectories
 
 for subdir in subdirs:
+    # Updated path to align with Snakemake's directory structure
     input_file = os.path.join(input_root_dir, subdir, "consolidated-net_defaultid.tsv")
     output_file = os.path.join(output_root_dir, f"{subdir}_formatted_network.tsv")
 
